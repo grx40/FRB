@@ -60,12 +60,23 @@ def lightcone(**kwargs ):
     else:
         sharp_cutoff = np.inf
 
-
+    #21cmFAST boxes have different naming tags, if it is an ionization box the redshifts info will be found
+    #at different parts of the filename as compared to a density box
+    if 'smoothed' in marker:
+        #this is a density box box
+        s,e=25,31
+    else:
+        if 'xH' in marker:
+            s,e = 10, 20
+        else:
+            print('We can not identify what box this is')
+            return -1
+    
+    #the total range of redshifts that this lightcone will span
     z_range_of_boxes = np.linspace(z_start,z_end,nboxes)
-#print(z_end)
-#   print(z_start)
-#   print(nboxes)
-#print(z_range_of_boxes)
+
+
+
 
     ####################################################
     # useful functions
@@ -78,19 +89,17 @@ def lightcone(**kwargs ):
 
     box_path = np.zeros((len(z_range_of_boxes)), dtype = 'object')
     box_path_redshifts = np.zeros((len(box_path)))
-    for fn in os.listdir(directory):   #parse the boxes
-        #print(fn)
+    for fn in os.listdir(directory):   #store the filename and directories of the boxes
         for z in range(len(z_range_of_boxes)):
-            #print(z_range_of_boxes[z])
-            if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn:
-                #print(z_range_of_boxes[z], fn)
+            if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
                 box_path[z] = fn
-                index = box_path[z].find('_z0')
-                start = index + len('_z0')
-                box_path_redshifts[z] = float(box_path[z][start:start + 4])
+                #this next part searches the filename for the redshift, however we now realize that this doesn't need to be done
+                #index = box_path[z].find('_z0')
+                #start = index + len('_z0')
+                #box_path_redshifts[z] = float(box_path[z][start:start + 4])
 
 
-    #function to determine weighting of each redshift to boxes
+    #this function determines which boxes a given redshift lies between
     def find_sandwiched_bins(z_range, z):
         z_floor = np.max(z_range)
         z_ceil = z_range[1]
@@ -100,6 +109,7 @@ def lightcone(**kwargs ):
                 return ( z_ceil, z_floor)
             z_floor = z_ceil
             if z_ceil == np.max(z_range):
+                print('looking for ' , z_range, z)
                 break
             z_ceil = z_range[binn+1]
             binn += 1
@@ -108,10 +118,11 @@ def lightcone(**kwargs ):
                 print('breaking')
                 break
 
-
+    #function which converts a comoving distance to a pixel location within the box
     def comoving2pixel(DIM, Box_length, comoving_distance):
         return int(float(comoving_distance * DIM)/float(Box_length))
 
+    #function which determines whether we have exceeded the maximum allowable redshift for a box
     def didweswitchbox(historyofzminus, z_plus, ctr):
         if z_plus < historyofzminus[ctr - 1 ]:
             return True
@@ -139,14 +150,23 @@ def lightcone(**kwargs ):
     # loop through redshifts
     ####################################################
 
+    box_path_redshifts = z_range_of_boxes
+
+    #scroll through all the redshifts and pick out the slice of the box that corresponds to that z
     while(z > np.min(z_range)):
+        
+        #this redshift is sandwiched between the following z
         z_sandwhich = find_sandwiched_bins(box_path_redshifts, z)
         z_minus = z_sandwhich[0]
         z_plus = z_sandwhich[1]
+        
         historyofzminus.append(z_plus)
+        
+        #these are the boxes that z is sandwiched between
         xH_minus = box_maker(box_path[list(box_path_redshifts).index(z_minus)])
         xH_plus = box_maker(box_path[list(box_path_redshifts).index(z_plus)])
         
+        #convert that redshift to a comoving distance
         comoving_distance_z = cosmo.comoving_distance(z).value
         comoving_distance_z0_to_z = comoving_distance_z0_zstart - comoving_distance_z
         comoving_distance_from_last_switch = cosmo.comoving_distance(z_plus).value
@@ -159,15 +179,14 @@ def lightcone(**kwargs ):
 
         else:
             if didweswitchbox(historyofzminus, z_plus, ctr):
-                #print('we switched box to', z_plus)
-                #print(z_plus, z , historyofzminus[ctr-1])
                 pixel_origin = prev_pix_loc
             pixel_location_relative_to_origin = -comoving2pixel(DIM,Box_length, comoving_distance_from_last_switch - comoving_distance_z)
             pixel_addition = (pixel_location_relative_to_origin + pixel_origin)%DIM
             prev_pix_loc = pixel_addition
 
+        #save this redshift
         zs.append(z)
-        
+        #save the box information for this particular lightcone slice
         lightcone[ctr,:,:] =  (xH_plus[pixel_addition,:,:] - xH_minus[pixel_addition,:,:])*((z - z_minus)/(z_plus - z_minus)) + xH_minus[pixel_addition,:,:]
     
         lightcone_halo[ctr] =  (xH_plus[pixel_addition][halo_location_x][halo_location_y] - xH_minus[pixel_addition][halo_location_x][halo_location_y])*((z - z_minus)/(z_plus - z_minus)) + xH_minus[pixel_addition][halo_location_x][halo_location_y]
@@ -178,14 +197,14 @@ def lightcone(**kwargs ):
         #safety net
         if ctr > N:
             break
+        #does the user want us to stop the z scroll after a particular value?
         if ctr >= sharp_cutoff:
             if return_redshifts:
                 return lightcone[1:sharp_cutoff,:,] , np.array(zs[1:])
             else:
                 return lightcone[1:sharp_cutoff,:,]
 
-    #return the lightcone history as an array across all redshifts
-    
+    #return the lightcone history as the redshift log (should the user specify that)
     if return_redshifts:
         return lightcone , np.array(zs)
     else:
