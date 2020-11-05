@@ -33,22 +33,21 @@ def lightcone(**kwargs ):
         marker = kwargs.get('marker')
     if 'DIM' in kwargs:
         DIM = kwargs.get('DIM')
+    if 'z_range_of_boxes' in kwargs:
+        z_range_of_boxes  = kwargs.get('z_range_of_boxes')
+        print(z_range_of_boxes)
+        nboxes = len(z_range_of_boxes)
+        z_start = np.max(z_range_of_boxes)
+        z_end = np.min(z_range_of_boxes)
+        print(z_start,z_end, nboxes)
     if 'N' in kwargs:
         N = kwargs.get('N')
+    else:
+        N = 50*nboxes
     if 'Box_length' in kwargs:
         Box_length = kwargs.get('Box_length')
-    if 'z_start' in kwargs:
-        z_start = kwargs.get('z_start')
-    if 'z_end' in kwargs:
-        z_end = kwargs.get('z_end')
-    if 'nboxes' in kwargs:
-        nboxes = kwargs.get('nboxes')
     if 'directory' in kwargs:
         directory = kwargs.get('directory')
-    if 'halo_location_x' in kwargs:
-        halo_location_x = kwargs.get('halo_location_x')
-    if 'halo_location_y' in kwargs:
-        halo_location_y = kwargs.get('halo_location_y')
     if 'box_slice' in kwargs:
         slice = kwargs.get('box_slice')
     if 'return_redshifts' in kwargs:
@@ -69,11 +68,15 @@ def lightcone(**kwargs ):
         if 'xH' in marker:
             s,e = 10, 20
         else:
-            print('We can not identify what box this is')
-            return -1
+            if 'halos' in marker:
+                s , e = 5, 10
+            else:
+                print('We can not identify what box this is')
+                return -1
     
     #the total range of redshifts that this lightcone will span
     z_range_of_boxes = np.linspace(z_start,z_end,nboxes)
+    print(z_range_of_boxes)
 
 
 
@@ -176,6 +179,14 @@ def lightcone(**kwargs ):
             pixel_addition = comoving2pixel(DIM,Box_length, comoving_distance_z0_to_z)
             prev_pix_loc = -pixel_addition + slice
             pixel_origin = slice
+            #save this redshift
+            zs.append(z)
+            lightcone[ctr,:,:] =  (xH_plus[:,:,slice] - xH_minus[:,:,slice])*((z - z_minus)/(z_plus - z_minus)) + xH_minus[:,:,slice]
+            #increment counter and redshift
+            ctr += 1
+            z = z_range[ctr]
+            #skip to the next step
+            continue
 
         else:
             if didweswitchbox(historyofzminus, z_plus, ctr):
@@ -188,8 +199,7 @@ def lightcone(**kwargs ):
         zs.append(z)
         #save the box information for this particular lightcone slice
         lightcone[ctr,:,:] =  (xH_plus[pixel_addition,:,:] - xH_minus[pixel_addition,:,:])*((z - z_minus)/(z_plus - z_minus)) + xH_minus[pixel_addition,:,:]
-    
-        lightcone_halo[ctr] =  (xH_plus[pixel_addition][halo_location_x][halo_location_y] - xH_minus[pixel_addition][halo_location_x][halo_location_y])*((z - z_minus)/(z_plus - z_minus)) + xH_minus[pixel_addition][halo_location_x][halo_location_y]
+
 
         ctr += 1
         z = z_range[ctr]
@@ -200,15 +210,15 @@ def lightcone(**kwargs ):
         #does the user want us to stop the z scroll after a particular value?
         if ctr >= sharp_cutoff:
             if return_redshifts:
-                return lightcone[1:sharp_cutoff,:,] , np.array(zs[1:])
+                return lightcone[0:sharp_cutoff,:,] , np.array(zs[0:])
             else:
-                return lightcone[1:sharp_cutoff,:,]
+                return lightcone[0:sharp_cutoff,:,]
 
     #return the lightcone history as the redshift log (should the user specify that)
     if return_redshifts:
-        return lightcone , np.array(zs)
+        return lightcone[0:int(N-1),:,] , np.array(zs)
     else:
-        return lightcone
+        return lightcone[0:int(N-1),:,]
 
 
 #lightconepng = lightcone(N = 500 )
