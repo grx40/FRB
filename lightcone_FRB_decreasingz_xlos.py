@@ -94,8 +94,13 @@ def lightcone(**kwargs ):
     box_path_redshifts = np.zeros((len(box_path)))
     for fn in os.listdir(directory):   #store the filename and directories of the boxes
         for z in range(len(z_range_of_boxes)):
-            if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
-                box_path[z] = fn
+            if z_range_of_boxes[z] == 0.0:
+                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
+                    if '10.0' not in fn:
+                        box_path[z] = fn
+            else:
+                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
+                    box_path[z] = fn
                 #this next part searches the filename for the redshift, however we now realize that this doesn't need to be done
                 #index = box_path[z].find('_z0')
                 #start = index + len('_z0')
