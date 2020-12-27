@@ -3,7 +3,7 @@
 
 #This code takes in an arbitrary set of boxes, whose directory and redshift ranges you must provide, and makes a lightcone
 import numpy as np
-import matplotlib.pyplot as pl
+#import matplotlib.pyplot as pl
 import sys
 import os
 import astropy
@@ -58,7 +58,11 @@ def lightcone(**kwargs ):
         sharp_cutoff = kwargs.get('sharp_cutoff')
     else:
         sharp_cutoff = np.inf
-
+    if 'tag' in kwargs:
+        tag = kwargs.get('tag')
+    else:
+        tag = str('5015241')
+        print('setting tag to 5015241')
     #21cmFAST boxes have different naming tags, if it is an ionization box the redshifts info will be found
     #at different parts of the filename as compared to a density box
     if 'smoothed' in marker:
@@ -85,7 +89,7 @@ def lightcone(**kwargs ):
     # useful functions
     ####################################################
 
-    def box_maker(name):       #reads in the boxes
+    def box_maker(name): #reads in the boxes
         data = np.fromfile(directory + name ,dtype=np.float32)
         box = data.reshape((DIM,DIM,DIM))
         return box
@@ -95,11 +99,11 @@ def lightcone(**kwargs ):
     for fn in os.listdir(directory):   #store the filename and directories of the boxes
         for z in range(len(z_range_of_boxes)):
             if z_range_of_boxes[z] == 0.0:
-                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
+                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e] and str(tag) in fn:
                     if '10.0' not in fn:
                         box_path[z] = fn
             else:
-                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e]:
+                if marker in fn and str(np.round(z_range_of_boxes[z],2)) in fn[s:e] and str(tag) in fn:
                     box_path[z] = fn
                 #this next part searches the filename for the redshift, however we now realize that this doesn't need to be done
                 #index = box_path[z].find('_z0')

@@ -4,13 +4,14 @@ from subprocess import *
 import os
 import emcee
 from emcee.utils import MPIPool
+#from schwimmbad import MPIPool
 import astropy
 import xi_2D
 import time
 import lightcone_FRB_decreasingz_xlos as lc
 import DM
 import h5py
-import matplotlib.pyplot as pl
+#import matplotlib.pyplot as pl
 import misc_functions as misc
 import mpi4py
 import lightcone_FRB_decreasingz_xlos_forHaloFinder as lcH
@@ -23,7 +24,17 @@ import lightcone_FRB_decreasingz_xlos_forHaloFinder as lcH
 RUN= int(np.abs(np.random.uniform(0, 2000)))
 os.system("echo RUN IS : " + str(RUN))
 
-
+os.system("mkdir ../Boxes/Output_files")
+boxes_path = '../Boxes/'
+def copy_FROM_TO(marker , FROM_OUTPUT_NUMBER, TO_OUTPUT_NUMBER):
+    #this does all boxes that have the desired tag
+    filename_list = open(boxes_path +'Output_files/filename_list_'+str(FROM_OUTPUT_NUMBER)+'_' +str(TO_OUTPUT_NUMBER), 'w')
+    call(["ls ../Boxes/*"  + str(FROM_OUTPUT_NUMBER)], stdout = filename_list, shell = True)
+    filename_list.close()
+    with open(boxes_path + 'Output_files/filename_list_'+str(FROM_OUTPUT_NUMBER)+'_' +str(TO_OUTPUT_NUMBER) , 'r') as inF:
+        for line in inF:
+            if str(marker) in line:
+                os.system("cp " + line.replace("\n", '') + " " + line.replace(str(FROM_OUTPUT_NUMBER),str(TO_OUTPUT_NUMBER)))
 
 def load_data(path, HII_DIM):
     data = np.fromfile(path ,dtype=np.float32)
@@ -65,8 +76,8 @@ cm2m = 0.01 #cm to m conversion
 
 #os.chdir("/home/grx40/projects/def-acliu/grx40/soft/21cmFASTM/Programs/")
 #dimensions and walkers of EnsembleSampler
-ndim = 1
-nwalkers = 2
+ndim = 4
+nwalkers = 24
 
 
 ####################################################################
@@ -85,6 +96,7 @@ halo_directory = '../Boxes/Default_Res/'
 lightcone_sharpcutoff = False
 z_end = 0.0
 z_start = 10.0
+#we never actually use this
 delta_z = 0.5
 box_slice = 199
 
@@ -100,47 +112,44 @@ densitylightcone = lc.lightcone(DIM = HII_DIM, z_range_of_boxes = z_range_of_hal
 
 #make the halolightcone
 #what is the redshift range spanned by the halo files?
-z_range_of_halo_boxes = np.linspace(10, 0.0, np.round(float(10)/float(0.5),2) + 1)
-print(z_range_of_halo_boxes)
+z_range_of_halo_boxes = np.linspace(10, 0.0, int(np.round(float(10)/float(0.5),2) + 1))
+os.system('echo ' + str(z_range_of_halo_boxes))
 
 #load halos (i.e. FRBs)
 halo_directory = '../Boxes/Halos/'
 
 #load all the halopos for all the redshifts and store them into a single array
-Halopos_z = np.zeros((len(z_range_of_halo_boxes)), dtype = object)
-for z in range(Halopos_z.shape[0]):
-    if z_range_of_halo_boxes[z] < 6.0:
-        print('switching to the same box')
+#Halopos_z = np.zeros((len(z_range_of_halo_boxes)), dtype = object)
+#for z in range(Halopos_z.shape[0]):
+#    if z_range_of_halo_boxes[z] < 6.0:
+#        print('switching to the same box')
         #switch to the same box over and over (because those boxes aren't made yet)
-        box = 'halos_z6.00_800_300Mpc_5015241'
-        Halopos_z[z] = np.genfromtxt(halo_directory + box, dtype=None)
-    else:
-        box = 'halos_z'+str(np.round(z_range_of_halo_boxes[z],1))+'0_800_300Mpc_5015241'
-        Halopos_z[z] = np.genfromtxt(halo_directory + box, dtype=None)
+        #        box = 'halos_z6.00_800_300Mpc_5015241'
+        #        Halopos_z[z] = np.genfromtxt(halo_directory + box, dtype=None)
+        #    else:
+        #        box = 'halos_z'+str(np.round(z_range_of_halo_boxes[z],1))+'0_800_300Mpc_5015241'
+        #Halopos_z[z] = np.genfromtxt(halo_directory + box, dtype=None)
 
-    os.system('echo Done redshift' + str(np.round(z_range_of_halo_boxes[z],1)))
+#os.system('echo Done redshift' + str(np.round(z_range_of_halo_boxes[z],1)))
 
 #save the lightcone should something go very very wrong
-np.savez('Halopos_z'+str(np.round(z_range_of_halo_boxes[z],1))+'_FRB.npz', Halopos_z = Halopos_z[z])
+#np.savez('Halopos_z'+str(np.round(z_range_of_halo_boxes[z],1))+'_FRB.npz', Halopos_z = Halopos_z[z])
 
 #do the lightcone for the Halo field
-Halo_Position_Box = np.zeros((len(z_range_of_halo_boxes), HII_DIM, HII_DIM, HII_DIM))
-Halo_Mass_Box = np.zeros_like(Halo_Position_Box)
-for z in range(len(z_range_of_halo_boxes)):
-    Halo_Position_Box[z] , Halo_Mass_Box[z] = misc.map2box(Halopos_z[z], HII_DIM)
-Halo_lightcone, halolightcone_redshifts = lcH.lightcone(DIM = HII_DIM, halo_boxes_z =  Halo_Position_Box, z_range_of_boxes = z_range_of_halo_boxes, box_slice = int(box_slice), return_redshifts = True)
-
+#Halo_Position_Box = np.zeros((len(z_range_of_halo_boxes), HII_DIM, HII_DIM, HII_DIM))
+#Halo_Mass_Box = np.zeros_like(Halo_Position_Box)
+#for z in range(len(z_range_of_halo_boxes)):
+#    Halo_Position_Box[z] , Halo_Mass_Box[z] = misc.map2box(Halopos_z[z], HII_DIM)
+#Halo_lightcone, halolightcone_redshifts = lcH.lightcone(DIM = HII_DIM, halo_boxes_z =  Halo_Position_Box, z_range_of_boxes = z_range_of_halo_boxes, box_slice = int(box_slice), return_redshifts = True)
 
 
 
 #load Fiducial stuff
 npzfile = np.load('Halo_lightcone.npz', allow_pickle = True)
 Halo_lightcone = npzfile['Halo_lightcone']
-
-npzfile = np.load('Density_and_xH_lightcones.npz')
-densitylightcone_beta_Dictionary = npzfile['densitylightcone_beta_Dictionary']
-lightcone_redshifts_fiducial = npzfile['lightcone_redshifts']
-
+npzfile = np.load('FRB_sample_data.npz')
+fiducial_DM_z = npzfile['fiducial_DM_z']
+os.system("echo shape of fiducial dm z " + str(fiducial_DM_z.shape))
 
 
 ####################################################################
@@ -162,11 +171,11 @@ def lnprior(x):
     return -np.inf
 
 
-def lnprob(x, fiducial_data ):
+def lnprob(x, fiducial_DM_z ):
     lp = lnprior(x)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(x, fiducial_data)
+    return lp + lnlike(x, fiducial_DM_z)
 
 beta_list = []
 zeta_list = []
@@ -174,7 +183,7 @@ Mturn_list = []
 model_DM_z = []
 Rmfp_list = []
 chi2_model = []
-def lnlike(x, fiducial_data):
+def lnlike(x, fiducial_DM_z):
     #draw a tag for this run
     OUTPUT_NUMBER = int(np.abs(np.random.uniform(1000000, 9990000)))
     
@@ -195,7 +204,7 @@ def lnlike(x, fiducial_data):
     else:
         sign = np.sign(-np.pi*(beta) - np.pi)
         sigma = np.abs(-np.pi*(beta) - np.pi)
-    
+
     t21_i = time.time()
     #make the reionization scenario for these parameters
     os.system("echo choice of beta is "  + str(beta) + ' leading to a sigma of' + str(sigma) +' with sign' + str(sign) )
@@ -209,18 +218,20 @@ def lnlike(x, fiducial_data):
     os.system("echo n boxes is " + str(nboxes))
     #make the lightcone for each quantity
     box_slice = 199
-    xH_lightcone_model , lightcone_redshifts = lc.lightcone(DIM = HII_DIM, z_range_of_boxes = z_range_of_halo_boxes, box_slice = int(box_slice), directory =  '../Boxes/', tag = OUTPUT_NUMBER, return_redshifts = True )
+    #cope the post EoR stuff
+    copy_FROM_TO('xH_', 5015241, OUTPUT_NUMBER)
+    xH_lightcone_model , lightcone_redshifts = lc.lightcone(DIM = HII_DIM, z_range_of_boxes = z_range_of_halo_boxes, N = 500, box_slice = int(box_slice), directory =  '../Boxes/', tag = OUTPUT_NUMBER, return_redshifts = True )
     
     os.system('echo Done making lightcone!')
     
     time_DM_start = time.time()
     #number of redshifts to include in our FRB plot
     lc_z_subsample = 10
-    DM_z_y_z_model = np.zeros((lc_z_subsample, HII_DIM, HII_DIM ))
-    n_FRBs_z = np.zeros((lc_z_subsample))
-    z_we_are_actually_using = np.zeros((lc_z_subsample))
+    DM_z_y_z_model = np.zeros((lc_z_subsample+1, HII_DIM, HII_DIM ))
+    n_FRBs_z = np.zeros((lc_z_subsample+1))
+    z_we_are_actually_using = np.zeros((lc_z_subsample+1))
     #start with z = 9.6 for now (redshift = 0 index)
-    for red_idx in range(lc_z_subsample):
+    for red_idx in range(lc_z_subsample+1):
         
         red = red_idx*int(len(lightcone_redshifts)/lc_z_subsample)
         z_we_are_actually_using[red_idx] =  lightcone_redshifts[red]
@@ -257,22 +268,23 @@ def lnlike(x, fiducial_data):
     #save results to an npz file
     np.savez('MCMC_snapshot_FRB' + str(RUN)+ '.npz', betas = np.array(beta_list) , zetas = np.array(zeta_list) , Mturns = np.array(Mturn_list),Rmfps = np.array(Rmfp_list) , model_DM_z = np.array(model_DM_z), chi2_model = np.array(chi2_model) )
 
-    return -chi_squared_total/2.
+    return (-chi_squared_total/2.)
 
 
 ####################################################################
 #                       Make Mock Data                            #
 ####################################################################
 pool = MPIPool()
+#with MPIPool() as pool:
 if not pool.is_master():
     pool.wait()
     sys.exit()
 
 #parameters used for making fiducial data
 #we are using a fiducial inside-out model
-npzfile = np.load('Fiducials.npz')
+npzfile = np.load('FRB_sample_data.npz')
 fiducial_DM_z = npzfile['fiducial_DM_z']
-fiducial_redshifts = npzfile['fiducial_redshifts']
+#fiducial_redshifts = npzfile['fiducial_redshifts']
 
 
 
@@ -281,23 +293,23 @@ fiducial_redshifts = npzfile['fiducial_redshifts']
 ####################################################################
 randomize = np.random.normal(1, 0.1, ndim * nwalkers).reshape((nwalkers, ndim))
 for i in range(nwalkers):
-    randomize[i][0] = np.random.uniform(0.25,0.95)
-    randomize[i][1] = np.random.uniform(300, 700)
-    randomize[i][2] = np.random.uniform(5, 15)
-    randomize[i][3] = np.random.uniform(20, 38)
+    randomize[i][0] = np.random.uniform(0.9,0.95)
+    randomize[i][1] = np.random.uniform(459, 550)
+    randomize[i][2] = np.random.uniform(9, 11)
+    randomize[i][3] = np.random.uniform(27, 33)
 
-#starting_parameters = randomize
+starting_parameters = randomize
 
 #npzfile = np.load('checkpoint_values_FRB_full.npz')
 #starting_parameters = npzfile['position']
 
 
 os.system('echo Our starting parameters have been saved ')
-np.savez('starting_params_full_FRB.npz' , starting_parameters = starting_parameters)
+np.savez('starting_params_test_FRB.npz' , starting_parameters = starting_parameters)
 
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, pool = pool,  args = [fiducial_DM_z])
-pos , prob , state = sampler.run_mcmc(starting_parameters, 30)
+pos , prob , state = sampler.run_mcmc(starting_parameters, 10)
 
 
 ####################################################################
@@ -308,7 +320,7 @@ pos , prob , state = sampler.run_mcmc(starting_parameters, 30)
 np.savez('checkpoint_values_FRB_full.npz', position = pos, probability = prob, stateof = state, acceptance_frac= np.mean(sampler.acceptance_fraction))
 
 #write out chain data to npz files
-np.savez('flatchain_FRB_' +str(RUN)+ '_full.npz', betas = sampler.flatchain[:,0],, zeta = sampler.flatchain[:,1] ,  Mturn = sampler.flatchain[:,2],  Rmfp = sampler.flatchain[:,3] ,  acceptance_frac= np.mean(sampler.acceptance_fraction))
+np.savez('flatchain_FRB_' +str(RUN)+ '_full.npz', betas = sampler.flatchain[:,0], zeta = sampler.flatchain[:,1] ,  Mturn = sampler.flatchain[:,2],  Rmfp = sampler.flatchain[:,3] ,  acceptance_frac= np.mean(sampler.acceptance_fraction))
 
 
 np.savez('chain_FRB_' + str(RUN) +'_full.npz', samples = sampler.chain)
